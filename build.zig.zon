@@ -5,13 +5,6 @@
     // This is a [Semantic Version](https://semver.org/).
     .version = "0.1.0",
 
-    .dependencies = .{
-        .zgl = .{
-            .url = "https://github.com/ziglibs/zgl/archive/master.tar.gz",
-            .hash = "12204115129438285a43d0a853d4d4bb86a63ab82b140189a47bc987f7b08d2252b0",
-        },
-    },
-
     .paths = .{
         "build.zig",
         "build.zig.zon",

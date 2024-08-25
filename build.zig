@@ -22,15 +22,9 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Use zgl
-    const zgl = b.dependency("zgl", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    exe.root_module.addImport("zgl", zgl.module("zgl"));
-
     // Import glfw3 and LibC libraries
     exe.linkSystemLibrary("glfw3");
+    exe.linkSystemLibrary("glew");
     exe.linkLibC();
 
     // This declares intent for the executable to be installed into the
