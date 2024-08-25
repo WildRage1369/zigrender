@@ -26,7 +26,7 @@ pub fn main() !void {
     glfw.glfwMakeContextCurrent(window);
 
     // Enable VSync
-    glfw.glfwSwapInterval(1);
+    // glfw.glfwSwapInterval(1);
 
     gl.glewExperimental = gl.GL_TRUE;
     _ = gl.glewInit();
@@ -42,11 +42,16 @@ pub fn main() !void {
         -0.5, -0.5, // Vertex 3 (X, Y)
     };
 
+    // initialize the vertex array
+    var vertex_array: gl.GLuint = undefined;
+    gl.glGenVertexArrays().?(1, &vertex_array);
+    gl.glBindVertexArray().?(vertex_array);
+
     // initialize the vertex buffer
     var vertex_buffer: gl.GLuint = undefined;
     gl.glCreateBuffers().?(1, &vertex_buffer);
     gl.glBindBuffer().?(gl.GL_ARRAY_BUFFER, vertex_buffer); // make vbo active
-    gl.glBufferData().?(gl.GL_ARRAY_BUFFER, @sizeOf(gl.GLfloat), &vertices, gl.GL_STATIC_DRAW);
+    gl.glBufferData().?(gl.GL_ARRAY_BUFFER, vertices.len, &vertices, gl.GL_STATIC_DRAW);
 
     // compile the vertex shader
     const vertex_shader: gl.GLuint = gl.glCreateShader().?(gl.GL_VERTEX_SHADER);
@@ -92,11 +97,6 @@ pub fn main() !void {
     gl.glVertexAttribPointer().?(position, 2, gl.GL_FLOAT, gl.GL_FALSE, 0, null);
     gl.glEnableVertexAttribArray().?(position);
 
-    // initialize the vertex array
-    var vertex_array: gl.GLuint = undefined;
-    gl.glGenVertexArrays().?(1, &vertex_array);
-    gl.glBindVertexArray().?(vertex_array);
-
     if (gl.glGetError() != 0) {
         std.debug.panic("Error: glGetError() returned {d}\n", .{gl.glGetError()});
     }
@@ -105,8 +105,10 @@ pub fn main() !void {
         if (glfw.glfwGetKey(window, glfw.GLFW_KEY_CAPS_LOCK) == glfw.GLFW_PRESS) {
             glfw.glfwSetWindowShouldClose(window, glfw.GL_TRUE);
         }
+
         const pressed = glfw.glfwGetKey(window, glfw.GLFW_KEY_CAPS_LOCK) == glfw.GLFW_PRESS;
-        std.debug.print("{any}", .{pressed});
+        std.debug.print("{any}\t", .{pressed});
+
         // clear screen to black
         gl.glClearColor(0.0, 0.0, 0.0, 1.0);
         gl.glClear(gl.GL_COLOR_BUFFER_BIT);
