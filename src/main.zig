@@ -6,8 +6,10 @@ const glfw = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
 
+const vertex_shader_source = @embedFile("vertex_source.glsl");
+const fragment_shader_source = @embedFile("fragment_source.glsl");
+
 pub fn main() !void {
-    // @setRuntimeSafety(false);
     if (glfw.glfwInit() == 0) {
         std.debug.panic("Error: GLFW Init failed", .{});
     }
