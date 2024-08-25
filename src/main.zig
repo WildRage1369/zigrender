@@ -42,49 +42,82 @@ pub fn main() !void {
         -0.5, -0.5, // Vertex 3 (X, Y)
     };
 
+    // initialize the vertex buffer
     var vertex_buffer: gl.GLuint = undefined;
     gl.glCreateBuffers().?(1, &vertex_buffer);
     gl.glBindBuffer().?(gl.GL_ARRAY_BUFFER, vertex_buffer); // make vbo active
-
     gl.glBufferData().?(gl.GL_ARRAY_BUFFER, @sizeOf(gl.GLfloat), &vertices, gl.GL_STATIC_DRAW);
 
+    // compile the vertex shader
     const vertex_shader: gl.GLuint = gl.glCreateShader().?(gl.GL_VERTEX_SHADER);
     gl.glShaderSource().?(vertex_shader, 1, &vertex_shader_source, null);
-
     gl.glCompileShader().?(vertex_shader);
 
-    var status: gl.GLint = undefined;
-    gl.glGetShaderiv().?(vertex_shader, gl.GL_COMPILE_STATUS, &status);
-    if (status == gl.GL_FALSE) {
-        std.debug.print("Shader failed to compile", .{});
+    // check for compile errors
+    var vertex_status: gl.GLint = undefined;
+    gl.glGetShaderiv().?(vertex_shader, gl.GL_COMPILE_STATUS, &vertex_status);
+    if (vertex_status == gl.GL_FALSE) {
+        std.debug.print("Vertex shader failed to compile", .{});
         var compile_log: [512]u8 = undefined;
         gl.glGetShaderInfoLog().?(vertex_shader, 512, null, compile_log[0..]);
         std.debug.panic("Shader Log:\n{s}", .{compile_log});
     }
-    // gl.glClearColor(0.2, 0.3, 0.3, 1.0);
-    // gl.glClear(gl.GL_COLOR_BUFFER_BIT);
 
+    // compile the fragment shader
+    const fragment_shader: gl.GLuint = gl.glCreateShader().?(gl.GL_FRAGMENT_SHADER);
+    gl.glShaderSource().?(fragment_shader, 1, &fragment_shader_source, null);
+    gl.glCompileShader().?(fragment_shader);
+
+    // check for compile errors
+    var fragment_status: gl.GLint = undefined;
+    gl.glGetShaderiv().?(fragment_shader, gl.GL_COMPILE_STATUS, &fragment_status);
+    if (fragment_status == gl.GL_FALSE) {
+        std.debug.print("fragment shader failed to compile", .{});
+        var compile_log: [512]u8 = undefined;
+        gl.glGetShaderInfoLog().?(fragment_shader, 512, null, compile_log[0..]);
+        std.debug.panic("Shader Log:\n{s}", .{compile_log});
+    }
+
+    // link the shaders to create a shader program
+    const shader_program = gl.glCreateProgram().?();
+    gl.glAttachShader().?(shader_program, vertex_shader);
+    gl.glAttachShader().?(shader_program, fragment_shader);
+
+    gl.glBindFragDataLocation().?(shader_program, 0, "outColor");
+    gl.glLinkProgram().?(shader_program);
+    gl.glUseProgram().?(shader_program);
+
+    const position: gl.GLuint = @intCast(gl.glGetAttribLocation().?(shader_program, "position"));
+    // Tells OpenGL that the shader has 2 components, of type float with stride and offset = 0
+    gl.glVertexAttribPointer().?(position, 2, gl.GL_FLOAT, gl.GL_FALSE, 0, null);
+    gl.glEnableVertexAttribArray().?(position);
+
+    // initialize the vertex array
+    var vertex_array: gl.GLuint = undefined;
+    gl.glGenVertexArrays().?(1, &vertex_array);
+    gl.glBindVertexArray().?(vertex_array);
+
+    if (gl.glGetError() != 0) {
+        std.debug.panic("Error: glGetError() returned {d}\n", .{gl.glGetError()});
+    }
     // ----- begin main loop -----
     while (glfw.glfwWindowShouldClose(window) == glfw.GLFW_FALSE) {
         if (glfw.glfwGetKey(window, glfw.GLFW_KEY_CAPS_LOCK) == glfw.GLFW_PRESS) {
             glfw.glfwSetWindowShouldClose(window, glfw.GL_TRUE);
         }
+        const pressed = glfw.glfwGetKey(window, glfw.GLFW_KEY_CAPS_LOCK) == glfw.GLFW_PRESS;
+        std.debug.print("{any}", .{pressed});
+        // clear screen to black
+        gl.glClearColor(0.0, 0.0, 0.0, 1.0);
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT);
+
+        // draw a triangle from the 3 vertices
+        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 3);
+
+        // swap buffers
         glfw.glfwSwapBuffers(window);
-        glfw.glfwPollEvents();
     }
 }
-
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
-}
-
-const ConvertError = error{
-    TooBig,
-    TooSmall,
-};
 
 // Default GLFW error handling callback
 fn errorCallback(error_code: c_int, description: [*c]const u8) callconv(.C) void {
