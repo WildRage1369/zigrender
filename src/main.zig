@@ -6,11 +6,11 @@ const glfw = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
 
-const vertex_shader_source = @embedFile("vertex_source.glsl");
-const fragment_shader_source = @embedFile("fragment_source.glsl");
+const vertex_shader_source: [*c]const u8 = @embedFile("vertex_source.glsl");
+const fragment_shader_source: [*c]const u8 = @embedFile("fragment_source.glsl");
 
 pub fn main() !void {
-    if (glfw.glfwInit() == 0) {
+    if (glfw.glfwInit() == glfw.GLFW_FALSE) {
         std.debug.panic("Error: GLFW Init failed", .{});
     }
     defer glfw.glfwTerminate();
@@ -31,8 +31,6 @@ pub fn main() !void {
     gl.glewExperimental = gl.GL_TRUE;
     _ = gl.glewInit();
 
-    //----- end window setup -----
-
     var width: c_int = undefined;
     var height: c_int = undefined;
     glfw.glfwGetFramebufferSize(window, &width, &height);
@@ -50,12 +48,24 @@ pub fn main() !void {
 
     gl.glBufferData().?(gl.GL_ARRAY_BUFFER, @sizeOf(gl.GLfloat), &vertices, gl.GL_STATIC_DRAW);
 
-    gl.glClearColor(0.2, 0.3, 0.3, 1.0);
-    gl.glClear(gl.GL_COLOR_BUFFER_BIT);
+    const vertex_shader: gl.GLuint = gl.glCreateShader().?(gl.GL_VERTEX_SHADER);
+    gl.glShaderSource().?(vertex_shader, 1, &vertex_shader_source, null);
+
+    gl.glCompileShader().?(vertex_shader);
+
+    var status: gl.GLint = undefined;
+    gl.glGetShaderiv().?(vertex_shader, gl.GL_COMPILE_STATUS, &status);
+    if (status == gl.GL_FALSE) {
+        std.debug.print("Shader failed to compile", .{});
+        var compile_log: [512]u8 = undefined;
+        gl.glGetShaderInfoLog().?(vertex_shader, 512, null, compile_log[0..]);
+        std.debug.panic("Shader Log:\n{s}", .{compile_log});
+    }
+    // gl.glClearColor(0.2, 0.3, 0.3, 1.0);
+    // gl.glClear(gl.GL_COLOR_BUFFER_BIT);
 
     // ----- begin main loop -----
-
-    while (glfw.glfwWindowShouldClose(window) == 0) {
+    while (glfw.glfwWindowShouldClose(window) == glfw.GLFW_FALSE) {
         if (glfw.glfwGetKey(window, glfw.GLFW_KEY_CAPS_LOCK) == glfw.GLFW_PRESS) {
             glfw.glfwSetWindowShouldClose(window, glfw.GL_TRUE);
         }
