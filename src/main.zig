@@ -1,10 +1,14 @@
 const std = @import("std");
-const gl = @cImport({
+pub const gl = @cImport({
     @cInclude("GL/glew.h");
 });
-const glfw = @cImport({
+pub const glfw = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
+const sphere = @import("sphere.zig");
+
+const shader_input_len = 6;
+
 const vertex_shader_source: [*c]const u8 = @embedFile("vertex_source.glsl");
 const fragment_shader_source: [*c]const u8 = @embedFile("fragment_source.glsl");
 
@@ -90,11 +94,38 @@ pub fn main() !void {
 
     // ----- end shader setup ----
 
-    const vertices: [6]gl.GLfloat = .{
-        0.0, 0.5, // Vertex 1 (X, Y)
-        0.5, -0.5, // Vertex 2 (X, Y)
-        -0.5, -0.5, // Vertex 3 (X, Y)
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var obj_buf: ObjectBuffer = .{ .allocator = gpa.allocator() };
+    defer obj_buf.dealloc();
+
+    const vertices: []const gl.GLfloat = &.{
+        0.5, -0.5, 0.5, 1.0, 0.0, 0.0, // Bottom-right far : red
+        0.5, -0.5, -0.5, 0.0, 1.0, 0.0, // Bottom-right close : green
+        -0.5, -0.5, 0.5, 0.0, 0.0, 1.0, // Bottom-left far : blue
+        -0.5, -0.5, -0.5, 1.0, 1.0, 0.0, // Bottom-left close : yellow
+        0.0, 0.5, 0.0, 1.0, 1.0, 1.0, // Top : white
     };
+    const elements: []const gl.GLuint = &.{
+        4, 0, 2, // far face
+        4, 0, 1, // right face
+        4, 3, 2, // left face
+        4, 1, 3, // close face
+    };
+    try obj_buf.concatenateObject(vertices, elements);
+
+    const tri_vert: []const gl.GLfloat = &.{
+        -0.5, 0.0, 0.0, 1.0, 0.0, 0.0, // Vertex 1: Red
+        0.0, -1.0, 0.0, 0.0, 1.0, 0.0, // Vertex 2: Green
+        -1.0, -1.0, 0.0, 0.0, 0.0, 1.0, // Vertex 3: Blue
+    };
+
+    const tri_elems: []const gl.GLuint = &.{ 0, 1, 2 };
+    try obj_buf.concatenateObject(tri_vert, tri_elems);
+
+    // gl.gluPerspective(90, 16 / 9, 1, -1);
+    // gl.glEnable(gl.GL_DEPTH_TEST);
+    // gl.glDepthFunc(gl.GL_LESS);
+    // gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT);
 
     // initialize the vertex array
     var vertex_array: gl.GLuint = undefined;
@@ -105,12 +136,21 @@ pub fn main() !void {
     var vertex_buffer: gl.GLuint = undefined;
     gl.glCreateBuffers().?(1, &vertex_buffer);
     gl.glBindBuffer().?(gl.GL_ARRAY_BUFFER, vertex_buffer);
-    gl.glBufferData().?(gl.GL_ARRAY_BUFFER, vertices.len * @sizeOf(gl.GLfloat), &vertices, gl.GL_STATIC_DRAW);
+    gl.glBufferData().?(gl.GL_ARRAY_BUFFER, obj_buf.vertices_len * @sizeOf(gl.GLfloat), obj_buf.vertices.ptr, gl.GL_STATIC_DRAW);
 
-    const position: gl.GLint = gl.glGetAttribLocation().?(shader_program, "position");
-    // Tells OpenGL that the shader has 2 components, of type float with stride and offset = 0
-    gl.glVertexAttribPointer().?(@intCast(position), 2, gl.GL_FLOAT, gl.GL_FALSE, 2 * @sizeOf(gl.GLfloat), null);
-    gl.glEnableVertexAttribArray().?(@intCast(position));
+    // initalize the element buffer
+    var element_buffer: gl.GLuint = undefined;
+    gl.glGenBuffers().?(1, &element_buffer);
+    gl.glBindBuffer().?(gl.GL_ELEMENT_ARRAY_BUFFER, element_buffer);
+    gl.glBufferData().?(gl.GL_ELEMENT_ARRAY_BUFFER, obj_buf.elements_len * @sizeOf(gl.GLuint), obj_buf.elements.ptr, gl.GL_STATIC_DRAW);
+
+    const position: gl.GLuint = @intCast(gl.glGetAttribLocation().?(shader_program, "position"));
+    gl.glVertexAttribPointer().?(position, 3, gl.GL_FLOAT, gl.GL_FALSE, shader_input_len * @sizeOf(gl.GLfloat), null);
+    gl.glEnableVertexAttribArray().?(position);
+
+    const color: gl.GLuint = @intCast(gl.glGetAttribLocation().?(shader_program, "color"));
+    gl.glVertexAttribPointer().?(color, 3, gl.GL_FLOAT, gl.GL_FALSE, shader_input_len * @sizeOf(gl.GLfloat), @ptrFromInt(3 * @sizeOf(gl.GLfloat)));
+    gl.glEnableVertexAttribArray().?(color);
 
     if (gl.glGetError() != 0) {
         std.debug.panic("Error: glGetError() returned {d}\n", .{gl.glGetError()});
@@ -118,18 +158,21 @@ pub fn main() !void {
 
     // ----- begin main loop -----
     while (glfw.glfwWindowShouldClose(window) == glfw.GLFW_FALSE) {
-        if (glfw.glfwGetKey(window, glfw.GLFW_KEY_CAPS_LOCK) == glfw.GLFW_PRESS) {
-            glfw.glfwSetWindowShouldClose(window, glfw.GL_TRUE);
+        for (0..@intCast(obj_buf.elements_len)) |i| {
+            if (glfw.glfwGetKey(window, glfw.GLFW_KEY_CAPS_LOCK) == glfw.GLFW_PRESS) {
+                glfw.glfwSetWindowShouldClose(window, glfw.GL_TRUE);
+            }
+            gl.glClearColor(0.0, 0.0, 0.0, 1.0);
+            gl.glClear(gl.GL_COLOR_BUFFER_BIT);
+
+            gl.glDrawElements(gl.GL_TRIANGLES, @intCast(i), gl.GL_UNSIGNED_INT, null);
+            // gl.glDrawArrays(gl.GL_POINTS, 0, @intCast(i));
+
+            glfw.glfwSwapBuffers(window);
+            glfw.glfwPollEvents();
+            std.time.sleep(300 * std.time.ns_per_ms);
+            std.debug.print("i: {d}\n", .{i});
         }
-        // clear screen to black
-        gl.glClearColor(0.0, 0.0, 0.0, 1.0);
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT);
-
-        // draw a triangle from the 3 vertices
-        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 3);
-
-        glfw.glfwSwapBuffers(window);
-        glfw.glfwPollEvents();
     }
 }
 
@@ -137,3 +180,55 @@ pub fn main() !void {
 fn errorCallback(error_code: c_int, description: [*c]const u8) callconv(.C) void {
     std.log.err("glfw: {}: {s}\n", .{ error_code, description });
 }
+
+const ObjectLocations = struct { vertex_start: []gl.GLfloat, element_start: []gl.GLuint };
+
+const ObjectBuffer = struct {
+    vertices: []gl.GLfloat = undefined, // slice of type GLfloat
+    vertices_len: c_int = 0,
+    object_locations: ?ObjectLocations = undefined,
+    elements: []gl.GLuint = undefined, // slice of type GLuint
+    elements_len: c_int = 0,
+    allocator: std.mem.Allocator,
+    tri_param_len: u32 = 6,
+
+    pub fn concatenateObject(self: *ObjectBuffer, vert: []const gl.GLfloat, elems: []const gl.GLuint) !void {
+        if (self.elements_len == 0) {
+            self.vertices = try self.allocator.alloc(gl.GLfloat, vert.len);
+            self.elements = try self.allocator.alloc(gl.GLuint, elems.len);
+            @memcpy(self.vertices, vert);
+            @memcpy(self.elements, elems);
+            std.debug.print("verts: {d}\nelems: {d}\n", .{ self.vertices, self.elements });
+        } else {
+            const tmp_vert = try self.allocator.alloc(gl.GLfloat, self.vertices.len + vert.len);
+            const tmp_elems = try self.allocator.alloc(gl.GLuint, self.elements.len + elems.len);
+
+            const tri_offset: c_uint = @intCast(self.vertices.len / self.tri_param_len);
+
+            @memcpy(tmp_vert[0..self.vertices.len], self.vertices);
+            @memcpy(tmp_elems[0..self.elements.len], self.elements);
+
+            @memcpy(tmp_vert[self.vertices.len..], vert);
+            @memcpy(tmp_elems[self.elements.len..], elems);
+
+            // offset all new elements by the number of verteces in the last object
+            for (tmp_elems[self.elements.len..]) |*num| {
+                num.* += tri_offset;
+            }
+
+            self.allocator.free(self.vertices);
+            self.allocator.free(self.elements);
+
+            self.vertices = tmp_vert;
+            self.elements = tmp_elems;
+        }
+        // self.tri_param_len += tri_count;
+        self.elements_len = @intCast(self.elements.len);
+        self.vertices_len = @intCast(self.vertices.len);
+    }
+
+    pub fn dealloc(self: ObjectBuffer) void {
+        self.allocator.free(self.vertices);
+        self.allocator.free(self.elements);
+    }
+};
