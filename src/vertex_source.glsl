@@ -1,7 +1,14 @@
 #version 460 core
 
-in vec2 position;
+in vec3 position;
+in vec3 color;
+
+out vec3 Color;
 
 void main() {
-    gl_Position = vec4(position, 0.0, 1.0);
+    // Color.r = color.r * abs(position.y);
+    // Color.g = color.g * abs(position.y);
+    // Color.b = color.b * abs(position.y);
+    Color = color;
+    gl_Position = vec4(position, 1.0);
 }
