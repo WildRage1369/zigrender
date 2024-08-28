@@ -5,7 +5,7 @@ pub const gl = @cImport({
 pub const glfw = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
-const sphere = @import("sphere.zig");
+// const sphere = @import("sphere.zig");
 
 const shader_input_len = 6;
 
@@ -113,19 +113,17 @@ pub fn main() !void {
     };
     try obj_buf.concatenateObject(vertices, elements);
 
-    const tri_vert: []const gl.GLfloat = &.{
+    const plane_vert: []const gl.GLfloat = &.{
         -0.5, 0.0, 0.0, 1.0, 0.0, 0.0, // Vertex 1: Red
         0.0, -1.0, 0.0, 0.0, 1.0, 0.0, // Vertex 2: Green
         -1.0, -1.0, 0.0, 0.0, 0.0, 1.0, // Vertex 3: Blue
     };
 
-    const tri_elems: []const gl.GLuint = &.{ 0, 1, 2 };
-    try obj_buf.concatenateObject(tri_vert, tri_elems);
+    const plane_elems: []const gl.GLuint = &.{ 0, 1, 2, 1, 2, 0 };
+    try obj_buf.concatenateObject(plane_vert, plane_elems);
 
-    // gl.gluPerspective(90, 16 / 9, 1, -1);
-    // gl.glEnable(gl.GL_DEPTH_TEST);
-    // gl.glDepthFunc(gl.GL_LESS);
-    // gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT);
+    gl.glEnable(gl.GL_DEPTH_TEST);
+    gl.glDepthFunc(gl.GL_LESS);
 
     // initialize the vertex array
     var vertex_array: gl.GLuint = undefined;
@@ -158,21 +156,21 @@ pub fn main() !void {
 
     // ----- begin main loop -----
     while (glfw.glfwWindowShouldClose(window) == glfw.GLFW_FALSE) {
-        for (0..@intCast(obj_buf.elements_len)) |i| {
-            if (glfw.glfwGetKey(window, glfw.GLFW_KEY_CAPS_LOCK) == glfw.GLFW_PRESS) {
-                glfw.glfwSetWindowShouldClose(window, glfw.GL_TRUE);
-            }
-            gl.glClearColor(0.0, 0.0, 0.0, 1.0);
-            gl.glClear(gl.GL_COLOR_BUFFER_BIT);
-
-            gl.glDrawElements(gl.GL_TRIANGLES, @intCast(i), gl.GL_UNSIGNED_INT, null);
-            // gl.glDrawArrays(gl.GL_POINTS, 0, @intCast(i));
-
-            glfw.glfwSwapBuffers(window);
-            glfw.glfwPollEvents();
-            std.time.sleep(300 * std.time.ns_per_ms);
-            std.debug.print("i: {d}\n", .{i});
+        // for (0..@intCast(obj_buf.elements_len)) |i| {
+        if (glfw.glfwGetKey(window, glfw.GLFW_KEY_CAPS_LOCK) == glfw.GLFW_PRESS) {
+            glfw.glfwSetWindowShouldClose(window, glfw.GL_TRUE);
         }
+        gl.glClearColor(0.0, 0.0, 0.0, 1.0);
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT);
+
+        // gl.glDrawElements(gl.GL_TRIANGLES, @intCast(i), gl.GL_UNSIGNED_INT, null);
+        gl.glDrawElements(gl.GL_TRIANGLES, obj_buf.elements_len, gl.GL_UNSIGNED_INT, null);
+
+        glfw.glfwSwapBuffers(window);
+        glfw.glfwPollEvents();
+        // std.time.sleep(150 * std.time.ns_per_ms);
+        // std.debug.print("i: {d}\n", .{i});
+        // }
     }
 }
 
@@ -198,7 +196,6 @@ const ObjectBuffer = struct {
             self.elements = try self.allocator.alloc(gl.GLuint, elems.len);
             @memcpy(self.vertices, vert);
             @memcpy(self.elements, elems);
-            std.debug.print("verts: {d}\nelems: {d}\n", .{ self.vertices, self.elements });
         } else {
             const tmp_vert = try self.allocator.alloc(gl.GLfloat, self.vertices.len + vert.len);
             const tmp_elems = try self.allocator.alloc(gl.GLuint, self.elements.len + elems.len);
