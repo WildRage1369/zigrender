@@ -5,6 +5,12 @@ pub const gl = @cImport({
 pub const glfw = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
+
+pub const glm = @cImport({
+    @cInclude("lib/glm/glm.hpp");
+    @cInclude("lib/glm/gtc/matrix_transform.hpp");
+    @cInclude("lib/glm/gtc/type_ptr.hpp");
+});
 // const sphere = @import("sphere.zig");
 
 const shader_input_len = 6;
