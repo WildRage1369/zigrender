@@ -14,7 +14,7 @@ const fragment_shader_source: [*c]const u8 = @embedFile("fragment_source.glsl");
 
 pub fn main() !void {
     if (glfw.glfwInit() == glfw.GLFW_FALSE) {
-        std.debug.panic("Error: GLFW Init failed", .{});
+        std.debug.panic("Error: GLFW Init failed\n", .{});
     }
 
     defer glfw.glfwTerminate();
@@ -22,7 +22,7 @@ pub fn main() !void {
 
     const window: ?*glfw.struct_GLFWwindow = glfw.glfwCreateWindow(800, 640, "ZigTracer", null, null);
     if (window == undefined) {
-        std.debug.panic("Error: Window or OpenGL context creation failed", .{});
+        std.debug.panic("Error: Window or OpenGL context creation failed\n", .{});
     }
     defer glfw.glfwDestroyWindow(window);
     glfw.glfwMakeContextCurrent(window);
@@ -50,10 +50,10 @@ pub fn main() !void {
     var vertex_status: gl.GLint = undefined;
     gl.glGetShaderiv().?(vertex_shader, gl.GL_COMPILE_STATUS, &vertex_status);
     if (vertex_status == gl.GL_FALSE) {
-        std.debug.print("Vertex shader failed to compile", .{});
+        std.debug.print("Vertex shader failed to compile.\n", .{});
         var compile_log: [512]u8 = undefined;
         gl.glGetShaderInfoLog().?(vertex_shader, 512, null, compile_log[0..]);
-        std.debug.panic("Shader Log:\n{s}", .{compile_log});
+        std.debug.panic("Shader Log: \n{s}\n", .{compile_log});
     }
 
     // compile the fragment shader
@@ -65,10 +65,10 @@ pub fn main() !void {
     var fragment_status: gl.GLint = undefined;
     gl.glGetShaderiv().?(fragment_shader, gl.GL_COMPILE_STATUS, &fragment_status);
     if (fragment_status == gl.GL_FALSE) {
-        std.debug.print("Fragment shader failed to compile", .{});
+        std.debug.print("Fragment shader failed to compile.\n", .{});
         var compile_log: [512]u8 = undefined;
         gl.glGetShaderInfoLog().?(fragment_shader, 512, null, compile_log[0..]);
-        std.debug.panic("Shader Log:\n{s}", .{compile_log});
+        std.debug.panic("Shader Log: \n{s}\n", .{compile_log});
     }
 
     // link the shaders to create a shader program
@@ -83,10 +83,10 @@ pub fn main() !void {
     var program_status: gl.GLint = undefined;
     gl.glGetProgramiv().?(shader_program, gl.GL_LINK_STATUS, &program_status);
     if (program_status == gl.GL_FALSE) {
-        std.debug.print("Program failed to link", .{});
+        std.debug.print("Program failed to link.\n", .{});
         var compile_log: [512]u8 = undefined;
         gl.glGetShaderInfoLog().?(shader_program, 512, null, compile_log[0..]);
-        std.debug.panic("Program Log:\n{s}", .{compile_log});
+        std.debug.panic("Program Log:\n{s}\n", .{compile_log});
     }
     gl.glUseProgram().?(shader_program);
     gl.glDeleteShader().?(vertex_shader);
@@ -146,7 +146,7 @@ pub fn main() !void {
     gl.glVertexAttribPointer().?(position, 3, gl.GL_FLOAT, gl.GL_FALSE, shader_input_len * @sizeOf(gl.GLfloat), null);
     gl.glEnableVertexAttribArray().?(position);
 
-    const color: gl.GLuint = @intCast(gl.glGetAttribLocation().?(shader_program, "color"));
+    const color: gl.GLuint = @intCast(@abs(gl.glGetAttribLocation().?(shader_program, "color")));
     gl.glVertexAttribPointer().?(color, 3, gl.GL_FLOAT, gl.GL_FALSE, shader_input_len * @sizeOf(gl.GLfloat), @ptrFromInt(3 * @sizeOf(gl.GLfloat)));
     gl.glEnableVertexAttribArray().?(color);
 
