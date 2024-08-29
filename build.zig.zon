@@ -5,6 +5,10 @@
     // This is a [Semantic Version](https://semver.org/).
     .version = "0.1.0",
 
+    .dependencies = .{
+        .zmath = .{ .path = "libs/zmath" },
+    },
+
     .paths = .{
         "build.zig",
         "build.zig.zon",
