@@ -5,13 +5,7 @@ pub const gl = @cImport({
 pub const glfw = @cImport({
     @cInclude("GLFW/glfw3.h");
 });
-
-pub const glm = @cImport({
-    @cInclude("lib/glm/glm.hpp");
-    @cInclude("lib/glm/gtc/matrix_transform.hpp");
-    @cInclude("lib/glm/gtc/type_ptr.hpp");
-});
-// const sphere = @import("sphere.zig");
+const zm = @import("zmath");
 
 const shader_input_len = 6;
 
@@ -104,29 +98,29 @@ pub fn main() !void {
     var obj_buf: ObjectBuffer = .{ .allocator = gpa.allocator() };
     defer obj_buf.dealloc();
 
-    const vertices: []const gl.GLfloat = &.{
+    // Create a pyramid and add it to the vertex and element buffers to be drawn
+    try obj_buf.concatenateObject(&.{
         0.5, -0.5, 0.5, 1.0, 0.0, 0.0, // Bottom-right far : red
         0.5, -0.5, -0.5, 0.0, 1.0, 0.0, // Bottom-right close : green
         -0.5, -0.5, 0.5, 0.0, 0.0, 1.0, // Bottom-left far : blue
         -0.5, -0.5, -0.5, 1.0, 1.0, 0.0, // Bottom-left close : yellow
         0.0, 0.5, 0.0, 1.0, 1.0, 1.0, // Top : white
-    };
-    const elements: []const gl.GLuint = &.{
+    }, &.{
         4, 0, 2, // far face
         4, 0, 1, // right face
         4, 3, 2, // left face
         4, 1, 3, // close face
-    };
-    try obj_buf.concatenateObject(vertices, elements);
+        0, 1, 2, // 1/2 of base
+        2, 1, 3, // 1/2 of base
+    });
 
-    const plane_vert: []const gl.GLfloat = &.{
-        -0.5, 0.0, 0.0, 1.0, 0.0, 0.0, // Vertex 1: Red
-        0.0, -1.0, 0.0, 0.0, 1.0, 0.0, // Vertex 2: Green
-        -1.0, -1.0, 0.0, 0.0, 0.0, 1.0, // Vertex 3: Blue
-    };
-
-    const plane_elems: []const gl.GLuint = &.{ 0, 1, 2, 1, 2, 0 };
-    try obj_buf.concatenateObject(plane_vert, plane_elems);
+    // Create a plane and add it to the vertex and element buffers to be drawn
+    try obj_buf.concatenateObject(&.{
+        -0.5, 0.5, -0.5, 0.5, 0.5, 0.5, // Left Far
+        0.5, 0.5, -0.5, 0.5, 0.5, 0.5, // Right Far
+        -0.5, 0.5, -0.5, 0.5, 0.5, 0.5, // Left Close
+        0.5, 0.5, -0.5, 0.5, 0.5, 0.5, // Right Close
+    }, &.{ 0, 1, 2, 2, 1, 3 });
 
     gl.glEnable(gl.GL_DEPTH_TEST);
     gl.glDepthFunc(gl.GL_LESS);
@@ -148,6 +142,7 @@ pub fn main() !void {
     gl.glBindBuffer().?(gl.GL_ELEMENT_ARRAY_BUFFER, element_buffer);
     gl.glBufferData().?(gl.GL_ELEMENT_ARRAY_BUFFER, obj_buf.elements_len * @sizeOf(gl.GLuint), obj_buf.elements.ptr, gl.GL_STATIC_DRAW);
 
+    // set up the vertex attributes of position and color
     const position: gl.GLuint = @intCast(gl.glGetAttribLocation().?(shader_program, "position"));
     gl.glVertexAttribPointer().?(position, 3, gl.GL_FLOAT, gl.GL_FALSE, shader_input_len * @sizeOf(gl.GLfloat), null);
     gl.glEnableVertexAttribArray().?(position);
@@ -156,46 +151,51 @@ pub fn main() !void {
     gl.glVertexAttribPointer().?(color, 3, gl.GL_FLOAT, gl.GL_FALSE, shader_input_len * @sizeOf(gl.GLfloat), @ptrFromInt(3 * @sizeOf(gl.GLfloat)));
     gl.glEnableVertexAttribArray().?(color);
 
+    // rotate the camera by -0.5 radians in the X axis
+    var trans = zm.matFromArr(.{ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 });
+    trans = zm.mul(trans, zm.rotationX(-0.5));
+    const transform_location: gl.GLint = @intCast(gl.glGetUniformLocation().?(shader_program, "transform"));
+    gl.glUniformMatrix4fv().?(transform_location, 1, gl.GL_FALSE, @ptrCast(&zm.matToArr(trans)));
+
     if (gl.glGetError() != 0) {
         std.debug.panic("Error: glGetError() returned {d}\n", .{gl.glGetError()});
     }
 
     // ----- begin main loop -----
     while (glfw.glfwWindowShouldClose(window) == glfw.GLFW_FALSE) {
-        // for (0..@intCast(obj_buf.elements_len)) |i| {
         if (glfw.glfwGetKey(window, glfw.GLFW_KEY_CAPS_LOCK) == glfw.GLFW_PRESS) {
             glfw.glfwSetWindowShouldClose(window, glfw.GL_TRUE);
         }
         gl.glClearColor(0.0, 0.0, 0.0, 1.0);
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT);
 
-        // gl.glDrawElements(gl.GL_TRIANGLES, @intCast(i), gl.GL_UNSIGNED_INT, null);
         gl.glDrawElements(gl.GL_TRIANGLES, obj_buf.elements_len, gl.GL_UNSIGNED_INT, null);
 
         glfw.glfwSwapBuffers(window);
         glfw.glfwPollEvents();
-        // std.time.sleep(150 * std.time.ns_per_ms);
-        // std.debug.print("i: {d}\n", .{i});
-        // }
     }
 }
 
-// Default GLFW error handling callback
+/// Default GLFW error handling callback
 fn errorCallback(error_code: c_int, description: [*c]const u8) callconv(.C) void {
     std.log.err("glfw: {}: {s}\n", .{ error_code, description });
 }
 
 const ObjectLocations = struct { vertex_start: []gl.GLfloat, element_start: []gl.GLuint };
 
+/// A structure to hold and manage the vertex and element buffers
+/// and help manage different objects to assist in adding and
+/// removing objects from the buffers
 const ObjectBuffer = struct {
-    vertices: []gl.GLfloat = undefined, // slice of type GLfloat
-    vertices_len: c_int = 0,
     object_locations: ?ObjectLocations = undefined,
-    elements: []gl.GLuint = undefined, // slice of type GLuint
+    vertices: []gl.GLfloat = undefined,
+    elements: []gl.GLuint = undefined,
+    vertices_len: c_int = 0,
     elements_len: c_int = 0,
     allocator: std.mem.Allocator,
     tri_param_len: u32 = 6,
 
+    /// Concatenates a new object to the vertex and element buffers
     pub fn concatenateObject(self: *ObjectBuffer, vert: []const gl.GLfloat, elems: []const gl.GLuint) !void {
         if (self.elements_len == 0) {
             self.vertices = try self.allocator.alloc(gl.GLfloat, vert.len);
@@ -214,7 +214,7 @@ const ObjectBuffer = struct {
             @memcpy(tmp_vert[self.vertices.len..], vert);
             @memcpy(tmp_elems[self.elements.len..], elems);
 
-            // offset all new elements by the number of verteces in the last object
+            // offset all new elements by the number of verteces in the objects
             for (tmp_elems[self.elements.len..]) |*num| {
                 num.* += tri_offset;
             }
@@ -225,11 +225,11 @@ const ObjectBuffer = struct {
             self.vertices = tmp_vert;
             self.elements = tmp_elems;
         }
-        // self.tri_param_len += tri_count;
         self.elements_len = @intCast(self.elements.len);
         self.vertices_len = @intCast(self.vertices.len);
     }
 
+    /// Deallocates the memory used by the vertex and element buffers
     pub fn dealloc(self: ObjectBuffer) void {
         self.allocator.free(self.vertices);
         self.allocator.free(self.elements);
