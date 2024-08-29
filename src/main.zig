@@ -40,9 +40,8 @@ pub fn main() !void {
 
     //----- end window setup -----
 
+    // Compile the shaders and return the shader program
     const shader_program = compileShaders();
-
-    // ----- end shader setup ----
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var obj_buf: ObjectBuffer = .{ .allocator = gpa.allocator() };
@@ -100,6 +99,12 @@ pub fn main() !void {
     const color: gl.GLuint = @intCast(@abs(gl.glGetAttribLocation().?(shader_program, "color")));
     gl.glVertexAttribPointer().?(color, 3, gl.GL_FLOAT, gl.GL_FALSE, shader_input_len * @sizeOf(gl.GLfloat), @ptrFromInt(3 * @sizeOf(gl.GLfloat)));
     gl.glEnableVertexAttribArray().?(color);
+
+    // define the projection matrix and pass it to the shader
+    var projection: zm.Mat = undefined;
+    projection = zm.perspectiveFovRhGl(90.0, @floatFromInt(@divTrunc(width, height)), 0.1, 100.0);
+    const projection_location: gl.GLint = @intCast(gl.glGetUniformLocation().?(shader_program, "projection"));
+    gl.glUniformMatrix4fv().?(projection_location, 1, gl.GL_FALSE, @ptrCast(&zm.matToArr(projection)));
 
     // rotate the camera by -0.5 radians in the X axis
     var trans = zm.matFromArr(.{ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 });
@@ -164,7 +169,7 @@ fn compileShaders() gl.GLuint {
     }
 
     // link the shaders to create a shader program
-    const shader_program = gl.glCreateProgram().?();
+    const shader_program: gl.GLuint = gl.glCreateProgram().?();
     gl.glAttachShader().?(shader_program, vertex_shader);
     gl.glAttachShader().?(shader_program, fragment_shader);
     gl.glBindFragDataLocation().?(shader_program, 0, "outColor");
