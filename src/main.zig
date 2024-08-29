@@ -39,58 +39,8 @@ pub fn main() !void {
     gl.glViewport(0, 0, width, height);
 
     //----- end window setup -----
-    //
 
-    // compile the vertex shader
-    const vertex_shader: gl.GLuint = gl.glCreateShader().?(gl.GL_VERTEX_SHADER);
-    gl.glShaderSource().?(vertex_shader, 1, &vertex_shader_source, null);
-    gl.glCompileShader().?(vertex_shader);
-
-    // check for compile errors
-    var vertex_status: gl.GLint = undefined;
-    gl.glGetShaderiv().?(vertex_shader, gl.GL_COMPILE_STATUS, &vertex_status);
-    if (vertex_status == gl.GL_FALSE) {
-        std.debug.print("Vertex shader failed to compile.\n", .{});
-        var compile_log: [512]u8 = undefined;
-        gl.glGetShaderInfoLog().?(vertex_shader, 512, null, compile_log[0..]);
-        std.debug.panic("Shader Log: \n{s}\n", .{compile_log});
-    }
-
-    // compile the fragment shader
-    const fragment_shader: gl.GLuint = gl.glCreateShader().?(gl.GL_FRAGMENT_SHADER);
-    gl.glShaderSource().?(fragment_shader, 1, &fragment_shader_source, null);
-    gl.glCompileShader().?(fragment_shader);
-
-    // check for compile errors
-    var fragment_status: gl.GLint = undefined;
-    gl.glGetShaderiv().?(fragment_shader, gl.GL_COMPILE_STATUS, &fragment_status);
-    if (fragment_status == gl.GL_FALSE) {
-        std.debug.print("Fragment shader failed to compile.\n", .{});
-        var compile_log: [512]u8 = undefined;
-        gl.glGetShaderInfoLog().?(fragment_shader, 512, null, compile_log[0..]);
-        std.debug.panic("Shader Log: \n{s}\n", .{compile_log});
-    }
-
-    // link the shaders to create a shader program
-    const shader_program = gl.glCreateProgram().?();
-    gl.glAttachShader().?(shader_program, vertex_shader);
-    gl.glAttachShader().?(shader_program, fragment_shader);
-    gl.glBindFragDataLocation().?(shader_program, 0, "outColor");
-
-    gl.glLinkProgram().?(shader_program);
-
-    // check for compile errors
-    var program_status: gl.GLint = undefined;
-    gl.glGetProgramiv().?(shader_program, gl.GL_LINK_STATUS, &program_status);
-    if (program_status == gl.GL_FALSE) {
-        std.debug.print("Program failed to link.\n", .{});
-        var compile_log: [512]u8 = undefined;
-        gl.glGetShaderInfoLog().?(shader_program, 512, null, compile_log[0..]);
-        std.debug.panic("Program Log:\n{s}\n", .{compile_log});
-    }
-    gl.glUseProgram().?(shader_program);
-    gl.glDeleteShader().?(vertex_shader);
-    gl.glDeleteShader().?(fragment_shader);
+    const shader_program = compileShaders();
 
     // ----- end shader setup ----
 
@@ -181,13 +131,66 @@ fn errorCallback(error_code: c_int, description: [*c]const u8) callconv(.C) void
     std.log.err("glfw: {}: {s}\n", .{ error_code, description });
 }
 
-const ObjectLocations = struct { vertex_start: []gl.GLfloat, element_start: []gl.GLuint };
+/// Compiles the vertex and fragment shaders and returns the shader program
+fn compileShaders() gl.GLuint {
+    // compile the vertex shader
+    const vertex_shader: gl.GLuint = gl.glCreateShader().?(gl.GL_VERTEX_SHADER);
+    gl.glShaderSource().?(vertex_shader, 1, &vertex_shader_source, null);
+    gl.glCompileShader().?(vertex_shader);
+
+    // check for compile errors
+    var vertex_status: gl.GLint = undefined;
+    gl.glGetShaderiv().?(vertex_shader, gl.GL_COMPILE_STATUS, &vertex_status);
+    if (vertex_status == gl.GL_FALSE) {
+        std.debug.print("Vertex shader failed to compile.\n", .{});
+        var compile_log: [512]u8 = undefined;
+        gl.glGetShaderInfoLog().?(vertex_shader, 512, null, compile_log[0..]);
+        std.debug.panic("Shader Log: \n{s}\n", .{compile_log});
+    }
+
+    // compile the fragment shader
+    const fragment_shader: gl.GLuint = gl.glCreateShader().?(gl.GL_FRAGMENT_SHADER);
+    gl.glShaderSource().?(fragment_shader, 1, &fragment_shader_source, null);
+    gl.glCompileShader().?(fragment_shader);
+
+    // check for compile errors
+    var fragment_status: gl.GLint = undefined;
+    gl.glGetShaderiv().?(fragment_shader, gl.GL_COMPILE_STATUS, &fragment_status);
+    if (fragment_status == gl.GL_FALSE) {
+        std.debug.print("Fragment shader failed to compile.\n", .{});
+        var compile_log: [512]u8 = undefined;
+        gl.glGetShaderInfoLog().?(fragment_shader, 512, null, compile_log[0..]);
+        std.debug.panic("Shader Log: \n{s}\n", .{compile_log});
+    }
+
+    // link the shaders to create a shader program
+    const shader_program = gl.glCreateProgram().?();
+    gl.glAttachShader().?(shader_program, vertex_shader);
+    gl.glAttachShader().?(shader_program, fragment_shader);
+    gl.glBindFragDataLocation().?(shader_program, 0, "outColor");
+
+    gl.glLinkProgram().?(shader_program);
+
+    // check for compile errors
+    var program_status: gl.GLint = undefined;
+    gl.glGetProgramiv().?(shader_program, gl.GL_LINK_STATUS, &program_status);
+    if (program_status == gl.GL_FALSE) {
+        std.debug.print("Program failed to link.\n", .{});
+        var compile_log: [512]u8 = undefined;
+        gl.glGetShaderInfoLog().?(shader_program, 512, null, compile_log[0..]);
+        std.debug.panic("Program Log:\n{s}\n", .{compile_log});
+    }
+    gl.glUseProgram().?(shader_program);
+    gl.glDeleteShader().?(vertex_shader);
+    gl.glDeleteShader().?(fragment_shader);
+    return shader_program;
+}
 
 /// A structure to hold and manage the vertex and element buffers
 /// and help manage different objects to assist in adding and
 /// removing objects from the buffers
 const ObjectBuffer = struct {
-    object_locations: ?ObjectLocations = undefined,
+    object_locations: struct { vertex_start: []gl.GLfloat, element_start: []gl.GLuint } = undefined,
     vertices: []gl.GLfloat = undefined,
     elements: []gl.GLuint = undefined,
     vertices_len: c_int = 0,
